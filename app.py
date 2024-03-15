@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import json
 import base64
+import io
 from PIL import Image
 
 # This sets the page title and a cute favicon
@@ -45,10 +46,6 @@ def load_blog_posts():
     except (FileNotFoundError, json.JSONDecodeError):
         return {"text_posts": [], "image_posts": []}
 
-# Save blog posts to JSON file
-def save_blog_posts(posts):
-    with open("blog_posts.json", "w") as f:
-        json.dump(posts, f, default=serialize)  # Use custom serialization function
 
 # Initialize session state to store blog posts
 if "blog_posts" not in st.session_state:
@@ -66,31 +63,40 @@ def add_text_post():
         st.session_state.blog_posts["text_posts"].append({"title": title, "content": content})
         save_blog_posts(st.session_state.blog_posts)
         st.success("Text post added!")
-        st.experimental_rerun()  # Rerun the app to display the updated list of posts
+        st.rerun()  # Rerun the app to display the updated list of posts
 
+# Function to add a new image-based blog post
 def add_image_post():
     title = st.text_input("Image Title")
     message = st.text_area("Image Message")
     uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
     if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        image_data = uploaded_file.read()
+        image_data = uploaded_file.read()  # Read the image file as binary bytes
         if st.button("Submit Image Post"):
+            # Encode image data to Base64 ASCII string
+            encoded_image_data = base64.b64encode(image_data).decode('ascii')
+            # Store the image as a Base64 string in the blog post
             st.session_state.blog_posts["image_posts"].append({
                 "title": title,
                 "message": message,
-                "image": image_data  # Store raw image data
+                "image": encoded_image_data  # Store the encoded image data
             })
             save_blog_posts(st.session_state.blog_posts)
             st.success("Image post added!")
-            st.experimental_rerun()  # Rerun the app to display the updated list of posts
+            st.rerun()  # Rerun the app to display the updated list of posts
+
+# Save blog posts to JSON file
+def save_blog_posts(posts):
+    with open("blog_posts.json", "w") as f:
+        # Use custom serialization function to handle bytes
+        json.dump(posts, f, default=serialize)
 
 # Custom serialization function to handle bytes
 def serialize(obj):
     if isinstance(obj, bytes):
-        return obj.decode("latin1")  # Convert bytes to string
+        # Convert bytes to ASCII string
+        return obj.decode('ascii')
     raise TypeError("Type not serializable")
-
             
 
 # Display the form for adding a new text-based blog post
