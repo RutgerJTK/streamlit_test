@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
-import seaborn as sns
+import json
+import base64
+from PIL import Image
 
 # This sets the page title and a cute favicon
 st.set_page_config(page_title="Squirrel Census", page_icon="🐿")
@@ -12,7 +14,6 @@ def load_data(file):
     return df
 
 data = load_data("data/squirrel_census.csv")
-
 
 st.title("The Central Park Squirrel Census🐿")
 st.image("data/central_park.jpg")
@@ -26,13 +27,100 @@ st.markdown(
      weren't even able to see what color they had 🐿💨"""
 )
 
-# Set a few custom parameters to make our plot blend in with the white background
-custom_params = {"axes.spines.right": False, "axes.spines.top": False}
-sns.set_theme(style="ticks", rc=custom_params)
-sns.color_palette("Set2")
+# Add a divider with custom style
+st.markdown("""
+    <hr style="
+        height: 2px;
+        background-color: #444;
+        border: none;
+        margin: 20px 0;
+    ">
+""", unsafe_allow_html=True)
 
-# Plot the fur data using Seaborn's countplot
-fig, ax = sns.subplots(figsize=(10, 5))
-ax = sns.countplot(data["Primary Fur Color"])
+# Load blog posts from JSON file
+def load_blog_posts():
+    try:
+        with open("blog_posts.json", "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"text_posts": [], "image_posts": []}
 
-st.pyplot(fig)
+# Save blog posts to JSON file
+def save_blog_posts(posts):
+    with open("blog_posts.json", "w") as f:
+        json.dump(posts, f, default=serialize)  # Use custom serialization function
+
+# Initialize session state to store blog posts
+if "blog_posts" not in st.session_state:
+    st.session_state.blog_posts = load_blog_posts()
+
+# Initialize session state to store blog posts
+if "blog_posts" not in st.session_state:
+    st.session_state.blog_posts = {"text_posts": [], "image_posts": []}
+
+# Function to add a new text-based blog post
+def add_text_post():
+    title = st.text_input("Post Title")
+    content = st.text_area("Post Content")
+    if st.button("Submit Text Post"):
+        st.session_state.blog_posts["text_posts"].append({"title": title, "content": content})
+        save_blog_posts(st.session_state.blog_posts)
+        st.success("Text post added!")
+        st.experimental_rerun()  # Rerun the app to display the updated list of posts
+
+def add_image_post():
+    title = st.text_input("Image Title")
+    message = st.text_area("Image Message")
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+        image_data = uploaded_file.read()
+        if st.button("Submit Image Post"):
+            st.session_state.blog_posts["image_posts"].append({
+                "title": title,
+                "message": message,
+                "image": image_data  # Store raw image data
+            })
+            save_blog_posts(st.session_state.blog_posts)
+            st.success("Image post added!")
+            st.experimental_rerun()  # Rerun the app to display the updated list of posts
+
+# Custom serialization function to handle bytes
+def serialize(obj):
+    if isinstance(obj, bytes):
+        return obj.decode("latin1")  # Convert bytes to string
+    raise TypeError("Type not serializable")
+
+            
+
+# Display the form for adding a new text-based blog post
+st.header("Create a New Text Post")
+add_text_post()
+
+# Display the form for adding a new image-based blog post
+st.header("Create a New Image Post")
+add_image_post()
+
+# Display all existing blog posts
+st.header("Blog Posts")
+
+# Display text-based blog posts
+st.subheader("Text Posts")
+if "text_posts" in st.session_state.blog_posts:
+    for post in st.session_state.blog_posts["text_posts"]:
+        st.subheader(post["title"])
+        st.write(post["content"])
+        st.markdown("---")  # Add a divider between posts
+else:
+    st.write("No text posts available.")
+
+# Display image-based blog posts
+st.subheader("Image Posts")
+if "image_posts" in st.session_state.blog_posts:
+    for post in st.session_state.blog_posts["image_posts"]:
+        st.subheader(post["title"])
+        st.write(post["message"])
+        st.image(base64.b64decode(post["image"]), use_column_width=True)
+        st.markdown("---")  # Add a divider between posts
+else:
+    st.write("No image posts available.")
